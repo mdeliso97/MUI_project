@@ -13,7 +13,7 @@ import mediapipe as mp
 
 import music21 as m21
 import threading
-import VocalAssistant as va
+from VocalAssistant import VocalAssistant
 
 from utils import CvFpsCalc
 from model import KeyPointClassifier
@@ -131,6 +131,8 @@ def main():
     #  ########################################################################
     mode = 0
 
+    va = VocalAssistant()
+
     while True:
         fps = cvFpsCalc.get()
 
@@ -202,7 +204,8 @@ def main():
                                             mp_hands.HandLandmark.THUMB_TIP]}
                 
                 if is_hand_near(results.multi_hand_landmarks[0].landmark):
-                    threading.Thread(target=va.command_respond, args=(results,)).start()
+                    #if va.vocal_output:
+                        threading.Thread(target=va.command_respond, args=(results,)).start()
                 else:
                     threading.Thread(target=play_chord, args=(finger_tips,)).start()
 
