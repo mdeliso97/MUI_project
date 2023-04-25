@@ -13,6 +13,7 @@ import mediapipe as mp
 
 import music21 as m21
 import threading
+import VocalAssistant as va
 
 from utils import CvFpsCalc
 from model import KeyPointClassifier
@@ -194,6 +195,8 @@ def main():
 
                 # Play chord in a separate thread
                 threading.Thread(target=play_chord, args=(finger_tips, mp_hands)).start()
+
+                threading.Thread(target=va.command_respond, args=(results,)).start()
 
                 # 描画
                 debug_image = draw_bounding_rect(use_brect, debug_image, brect)

@@ -6,10 +6,13 @@ vocal_output = False
 # Initialize the pyttsx3 engine
 engine = pyttsx3.init()
 
+for voice in engine.getProperty('voices'):
+    print(voice)
+
 # Set the voice to use (optional)
 voices = engine.getProperty('voices')
-engine.setProperty('voice', voices[1].id)  # Set the voice to the second voice in the list
-
+engine.setProperty('voice', 'english')  # Set the voice to the second voice in the list
+engine.setProperty('rate', 180)
 
 def command_respond(results):
     # Takes track of the previous vocal output
@@ -25,7 +28,7 @@ def command_respond(results):
             # Determine if the detected hand is a left or right hand
             if handness == 'Left' and not vocal_output:
                 # Detected hand is a right hand, axes inverted mirrored image
-                text = "Selected Right Hand"
+                text = "The right hand is now selected. Show me what you got!"
                 engine.say(text)
                 engine.runAndWait()
                 vocal_output = True
