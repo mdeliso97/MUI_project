@@ -194,22 +194,6 @@ def main():
                 most_common_fg_id = Counter(
                     finger_gesture_history).most_common()
 
-                finger_tips = {landmark: (hand_landmarks.landmark[landmark].x, 
-                                            hand_landmarks.landmark[landmark].y) 
-                                            for landmark in 
-                                            [mp_hands.HandLandmark.INDEX_FINGER_TIP, 
-                                            mp_hands.HandLandmark.MIDDLE_FINGER_TIP, 
-                                            mp_hands.HandLandmark.RING_FINGER_TIP, 
-                                            mp_hands.HandLandmark.PINKY_TIP, 
-                                            mp_hands.HandLandmark.THUMB_TIP]}
-                
-                if is_hand_near(results.multi_hand_landmarks[0].landmark):
-                    #if va.vocal_output:
-                        threading.Thread(target=va.command_respond, args=(results,)).start()
-                else:
-                    threading.Thread(target=play_chord, args=(finger_tips,)).start()
-
-
                 # 描画
                 debug_image = draw_bounding_rect(use_brect, debug_image, brect)
                 debug_image = draw_landmarks(debug_image, landmark_list)
@@ -220,6 +204,26 @@ def main():
                     keypoint_classifier_labels[hand_sign_id],
                     point_history_classifier_labels[most_common_fg_id[0][0]],
                 )
+
+                finger_tips = {landmark: (hand_landmarks.landmark[landmark].x, 
+                                            hand_landmarks.landmark[landmark].y) 
+                                            for landmark in 
+                                            [mp_hands.HandLandmark.INDEX_FINGER_TIP, 
+                                            mp_hands.HandLandmark.MIDDLE_FINGER_TIP, 
+                                            mp_hands.HandLandmark.RING_FINGER_TIP, 
+                                            mp_hands.HandLandmark.PINKY_TIP, 
+                                            mp_hands.HandLandmark.THUMB_TIP]}
+                if hand_sign_id == 1: #if hand is closed, play nothing
+                    continue
+                elif hand_sign_id == 2: #is hand is pointing, play the index finger tip
+                    dictToPlay = {mp_hands.HandLandmark.INDEX_FINGER_TIP: finger_tips[mp_hands.HandLandmark.INDEX_FINGER_TIP]}
+                    threading.Thread(target=play_chord, args=(dictToPlay,)).start()
+                    
+                elif is_hand_near(results.multi_hand_landmarks[0].landmark):
+                    threading.Thread(target=va.command_respond, args=(results,)).start()
+                else:
+                    threading.Thread(target=play_chord, args=(finger_tips,)).start()
+
         else:
             point_history.append([0, 0])
 
@@ -278,7 +282,6 @@ def calc_landmark_list(image, landmarks):
         landmark_point.append([landmark_x, landmark_y])
 
     return landmark_point
-
 
 def pre_process_landmark(landmark_list):
     temp_landmark_list = copy.deepcopy(landmark_list)
