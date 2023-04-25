@@ -19,7 +19,16 @@ from utils import CvFpsCalc
 from model import KeyPointClassifier
 from model import PointHistoryClassifier
 
-def play_chord(finger_tips, mp_hands):
+hand_near_threshold = -0.05
+
+def is_hand_near(landmarks):
+    sum = 0
+    for l in landmarks:
+        sum = sum + l.z
+    return True if sum / len(landmarks) < hand_near_threshold else False
+
+
+def play_chord(finger_tips):
     d = m21.duration.Duration()
     d.quarterLength = 0.1
 
@@ -72,6 +81,7 @@ def main():
     use_static_image_mode = args.use_static_image_mode
     min_detection_confidence = args.min_detection_confidence
     min_tracking_confidence = args.min_tracking_confidence
+    print(min_detection_confidence, min_tracking_confidence)
 
     use_brect = True
 
@@ -156,6 +166,7 @@ def main():
                 # 相対座標・正規化座標への変換
                 pre_processed_landmark_list = pre_process_landmark(
                     landmark_list)
+                
                 pre_processed_point_history_list = pre_process_point_history(
                     debug_image, point_history)
                 # 学習データ保存
@@ -180,8 +191,6 @@ def main():
                 finger_gesture_history.append(finger_gesture_id)
                 most_common_fg_id = Counter(
                     finger_gesture_history).most_common()
-                
-
 
                 finger_tips = {landmark: (hand_landmarks.landmark[landmark].x, 
                                             hand_landmarks.landmark[landmark].y) 
@@ -192,11 +201,11 @@ def main():
                                             mp_hands.HandLandmark.PINKY_TIP, 
                                             mp_hands.HandLandmark.THUMB_TIP]}
                 
+                if is_hand_near(results.multi_hand_landmarks[0].landmark):
+                    threading.Thread(target=va.command_respond, args=(results,)).start()
+                else:
+                    threading.Thread(target=play_chord, args=(finger_tips,)).start()
 
-                # Play chord in a separate thread
-                threading.Thread(target=play_chord, args=(finger_tips, mp_hands)).start()
-
-                threading.Thread(target=va.command_respond, args=(results,)).start()
 
                 # 描画
                 debug_image = draw_bounding_rect(use_brect, debug_image, brect)
