@@ -6,6 +6,7 @@ import argparse
 import itertools
 from collections import Counter
 from collections import deque
+import time
 
 import cv2 as cv
 import numpy as np
@@ -20,15 +21,17 @@ from model import KeyPointClassifier
 from model import PointHistoryClassifier
 
 hand_near_threshold = -0.05
+multiHandMode = True
+loop = []
 
-def is_hand_near(landmarks):
+def is_hand_near(landmarks): #make plane tilted
     sum = 0
     for l in landmarks:
         sum = sum + l.z
     return True if sum / len(landmarks) < hand_near_threshold else False
 
 
-def play_chord(finger_tips):
+def add_chord(finger_tips):
     d = m21.duration.Duration()
     d.quarterLength = 0.1
 
@@ -41,12 +44,26 @@ def play_chord(finger_tips):
              'C6', 'D6', 'E6', 'F6', 'G6', 'A6', 'B6']
 
     st2 = m21.stream.Stream()
-    chord2 = m21.chord.Chord([m21.pitch.Pitch(notes[int(finger_tips[keys[index]][0] * len(notes))]) for index in range(len(list(finger_tips.keys())))])
+    chord = m21.chord.Chord([m21.pitch.Pitch(notes[int(finger_tips[keys[index]][0] * len(notes))]) for index in range(len(list(finger_tips.keys())))])
     
-    st2.append(chord2)  
+    st2.append(chord)  
+    loop.append(chord)
+
     # Play the chord
     sp = m21.midi.realtime.StreamPlayer(st2)
     sp.play()
+
+def playLoop():
+    st2 = m21.stream.Stream()
+    for chord in loop:
+        st2.append(chord)  
+
+    # Play the chord
+    sp = m21.midi.realtime.StreamPlayer(st2)
+    sp.play()
+
+
+
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -133,6 +150,10 @@ def main():
 
     va = VocalAssistant()
 
+    last_left_hand_sign_id = -1
+    last_right_hand_sign_id = -1
+    last_hand_near = False
+
     while True:
         fps = cvFpsCalc.get()
 
@@ -205,6 +226,8 @@ def main():
                     point_history_classifier_labels[most_common_fg_id[0][0]],
                 )
 
+                leftOrRight=  handedness.classification[0].label[0:]
+
                 finger_tips = {landmark: (hand_landmarks.landmark[landmark].x, 
                                             hand_landmarks.landmark[landmark].y) 
                                             for landmark in 
@@ -213,17 +236,52 @@ def main():
                                             mp_hands.HandLandmark.RING_FINGER_TIP, 
                                             mp_hands.HandLandmark.PINKY_TIP, 
                                             mp_hands.HandLandmark.THUMB_TIP]}
-                if hand_sign_id == 1: #if hand is closed, play nothing
-                    continue
-                elif hand_sign_id == 2 and is_hand_near(results.multi_hand_landmarks[0].landmark): #is hand is pointing, play the index finger tip
-                    dictToPlay = {mp_hands.HandLandmark.INDEX_FINGER_TIP: finger_tips[mp_hands.HandLandmark.INDEX_FINGER_TIP]}
-                    threading.Thread(target=play_chord, args=(dictToPlay,)).start()
-                    
-                elif is_hand_near(results.multi_hand_landmarks[0].landmark):
-                    threading.Thread(target=va.command_respond, args=(results,)).start()
-                else:
-                    threading.Thread(target=play_chord, args=(finger_tips,)).start()
+                lm = results.multi_hand_landmarks[0].landmark
 
+                if not is_hand_near(lm):
+                    last_hand_near = False
+
+                
+
+                if leftOrRight == "Right" and is_hand_near(lm) and last_hand_near == False:
+                    last_hand_near = True
+
+                    if hand_sign_id == 1: #if hand is closed, play nothing
+                        last_right_hand_sign_id = 1
+                        continue
+                    elif hand_sign_id == 2: #is hand is pointing, play the index finger tip
+                        dictToPlay = {mp_hands.HandLandmark.INDEX_FINGER_TIP: finger_tips[mp_hands.HandLandmark.INDEX_FINGER_TIP]}
+                        threading.Thread(target=add_chord, args=(dictToPlay,)).start()
+
+                    elif hand_sign_id == 4: #is hand is in victory mode
+                        dictToPlay = {mp_hands.HandLandmark.INDEX_FINGER_TIP: finger_tips[mp_hands.HandLandmark.INDEX_FINGER_TIP],
+                                      mp_hands.HandLandmark.MIDDLE_FINGER_TIP: finger_tips[mp_hands.HandLandmark.MIDDLE_FINGER_TIP]}
+                        threading.Thread(target=add_chord, args=(dictToPlay,)).start()
+
+                    elif hand_sign_id == 5: #is hand is in thumb index mode
+                        dictToPlay = {mp_hands.HandLandmark.THUMB_TIP: finger_tips[mp_hands.HandLandmark.THUMB_TIP],
+                                      mp_hands.HandLandmark.INDEX_FINGER_TIP: finger_tips[mp_hands.HandLandmark.INDEX_FINGER_TIP]}
+                        threading.Thread(target=add_chord, args=(dictToPlay,)).start()
+                    
+                    elif hand_sign_id == 6 : #is hand is in thumb index mode
+                        dictToPlay = {mp_hands.HandLandmark.THUMB_TIP: finger_tips[mp_hands.HandLandmark.THUMB_TIP],
+                                      mp_hands.HandLandmark.MIDDLE_FINGER_TIP: finger_tips[mp_hands.HandLandmark.MIDDLE_FINGER_TIP]}
+                        threading.Thread(target=add_chord, args=(dictToPlay,)).start()
+                        
+                    elif is_hand_near(results.multi_hand_landmarks[0].landmark):
+                        threading.Thread(target=va.command_respond, args=(results,)).start()
+                    #else:
+                    #    threading.Thread(target=play_chord, args=(finger_tips,)).start()
+                
+                if leftOrRight == "Left" and hand_sign_id != last_left_hand_sign_id:
+                    if hand_sign_id == 0 and is_hand_near(results.multi_hand_landmarks[0].landmark):
+                        print("music stop")
+                        last_left_hand_sign_id = 0
+
+                    if hand_sign_id == 3 and is_hand_near(results.multi_hand_landmarks[0].landmark):
+                        threading.Thread(target=playLoop).start()
+                        last_left_hand_sign_id = 3
+                
         else:
             point_history.append([0, 0])
 
