@@ -34,14 +34,14 @@ def play_chord(finger_tips):
 
     keys = list(finger_tips.keys())
 
-    notes = ['B6', 'A6', 'G6', 'F6', 'E6', 'D6', 'C6',
-              'B5', 'A5', 'G5', 'F5', 'E5', 'D5', 'C5',
-              'B4', 'A4', 'G4', 'F4', 'E4', 'D4', 'C4',
-              'B3', 'A3', 'G3', 'F3', 'E3', 'D3', 'C3',
-              'B2', 'A2', 'G2', 'F2', 'E2', 'D2', 'C2']
+    notes = ['C2', 'D2', 'E2', 'F2', 'G2', 'A2', 'B2',
+             'C3', 'D3', 'E3', 'F3', 'G3', 'A3', 'B3',
+             'C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4',
+             'C5', 'D5', 'E5', 'F5', 'G5', 'A5', 'B5',
+             'C6', 'D6', 'E6', 'F6', 'G6', 'A6', 'B6']
 
     st2 = m21.stream.Stream()
-    chord2 = m21.chord.Chord([m21.pitch.Pitch(notes[int(finger_tips[keys[index]][1] * len(notes))]) for index in range(len(list(finger_tips.keys())))])
+    chord2 = m21.chord.Chord([m21.pitch.Pitch(notes[int(finger_tips[keys[index]][0] * len(notes))]) for index in range(len(list(finger_tips.keys())))])
     
     st2.append(chord2)  
     # Play the chord
@@ -193,7 +193,7 @@ def main():
                 finger_gesture_history.append(finger_gesture_id)
                 most_common_fg_id = Counter(
                     finger_gesture_history).most_common()
-
+                
                 # 描画
                 debug_image = draw_bounding_rect(use_brect, debug_image, brect)
                 debug_image = draw_landmarks(debug_image, landmark_list)
@@ -215,7 +215,7 @@ def main():
                                             mp_hands.HandLandmark.THUMB_TIP]}
                 if hand_sign_id == 1: #if hand is closed, play nothing
                     continue
-                elif hand_sign_id == 2: #is hand is pointing, play the index finger tip
+                elif hand_sign_id == 2 and is_hand_near(results.multi_hand_landmarks[0].landmark): #is hand is pointing, play the index finger tip
                     dictToPlay = {mp_hands.HandLandmark.INDEX_FINGER_TIP: finger_tips[mp_hands.HandLandmark.INDEX_FINGER_TIP]}
                     threading.Thread(target=play_chord, args=(dictToPlay,)).start()
                     
