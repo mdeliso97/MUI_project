@@ -1,4 +1,4 @@
-import pyttsx3
+import pyttsx4
 
 class VocalAssistant(object):
 
@@ -8,7 +8,7 @@ class VocalAssistant(object):
         self.vocal_output = False
 
         # Initialize the pyttsx3 engine
-        self.engine = pyttsx3.init()
+        self.engine = pyttsx4.init()
 
         # Set the voice to use (optional)
         self.voices = self.engine.getProperty('voices')
@@ -16,6 +16,11 @@ class VocalAssistant(object):
         self.engine.setProperty('rate', 180)
 
         self.last_command = None
+
+    def text_to_speech(self, text):
+        self.engine.say(text)
+        self.engine.runAndWait()
+
 
     def command_respond(self, results):
         # Takes track of the previous vocal output

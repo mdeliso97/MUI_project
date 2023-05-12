@@ -12,7 +12,6 @@ import cv2 as cv
 import numpy as np
 import mediapipe as mp
 
-import music21 as m21
 import threading
 from VocalAssistant import VocalAssistant
 
@@ -20,49 +19,16 @@ from utils import CvFpsCalc
 from model import KeyPointClassifier
 from model import PointHistoryClassifier
 
+from loop import loop
+
 hand_near_threshold = -0.05
 multiHandMode = True
-loop = []
 
 def is_hand_near(landmarks): #make plane tilted
     sum = 0
     for l in landmarks:
         sum = sum + l.z
     return True if sum / len(landmarks) < hand_near_threshold else False
-
-
-def add_chord(finger_tips):
-    d = m21.duration.Duration()
-    d.quarterLength = 0.1
-
-    keys = list(finger_tips.keys())
-
-    notes = ['C2', 'D2', 'E2', 'F2', 'G2', 'A2', 'B2',
-             'C3', 'D3', 'E3', 'F3', 'G3', 'A3', 'B3',
-             'C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4',
-             'C5', 'D5', 'E5', 'F5', 'G5', 'A5', 'B5',
-             'C6', 'D6', 'E6', 'F6', 'G6', 'A6', 'B6']
-
-    st2 = m21.stream.Stream()
-    chord = m21.chord.Chord([m21.pitch.Pitch(notes[int(finger_tips[keys[index]][0] * len(notes))]) for index in range(len(list(finger_tips.keys())))])
-    
-    st2.append(chord)  
-    loop.append(chord)
-
-    # Play the chord
-    sp = m21.midi.realtime.StreamPlayer(st2)
-    sp.play()
-
-def playLoop():
-    st2 = m21.stream.Stream()
-    for chord in loop:
-        st2.append(chord)  
-
-    # Play the chord
-    sp = m21.midi.realtime.StreamPlayer(st2)
-    sp.play()
-
-
 
 
 def get_args():
@@ -98,7 +64,6 @@ def main():
     use_static_image_mode = args.use_static_image_mode
     min_detection_confidence = args.min_detection_confidence
     min_tracking_confidence = args.min_tracking_confidence
-    print(min_detection_confidence, min_tracking_confidence)
 
     use_brect = True
 
@@ -111,7 +76,7 @@ def main():
     mp_hands = mp.solutions.hands
     hands = mp_hands.Hands(
         static_image_mode=use_static_image_mode,
-        max_num_hands=2,
+        max_num_hands=10,
         min_detection_confidence=min_detection_confidence,
         min_tracking_confidence=min_tracking_confidence,
     )
@@ -149,6 +114,7 @@ def main():
     mode = 0
 
     va = VocalAssistant()
+    l = loop()
 
     last_left_hand_sign_id = -1
     last_right_hand_sign_id = -1
@@ -241,46 +207,57 @@ def main():
                 if not is_hand_near(lm):
                     last_hand_near = False
 
-                
-
                 if leftOrRight == "Right" and is_hand_near(lm) and last_hand_near == False:
                     last_hand_near = True
 
                     if hand_sign_id == 1: #if hand is closed, play nothing
-                        last_right_hand_sign_id = 1
                         continue
                     elif hand_sign_id == 2: #is hand is pointing, play the index finger tip
                         dictToPlay = {mp_hands.HandLandmark.INDEX_FINGER_TIP: finger_tips[mp_hands.HandLandmark.INDEX_FINGER_TIP]}
-                        threading.Thread(target=add_chord, args=(dictToPlay,)).start()
+                        threading.Thread(target=l.add_chord, args=(dictToPlay,)).start()
 
                     elif hand_sign_id == 4: #is hand is in victory mode
                         dictToPlay = {mp_hands.HandLandmark.INDEX_FINGER_TIP: finger_tips[mp_hands.HandLandmark.INDEX_FINGER_TIP],
                                       mp_hands.HandLandmark.MIDDLE_FINGER_TIP: finger_tips[mp_hands.HandLandmark.MIDDLE_FINGER_TIP]}
-                        threading.Thread(target=add_chord, args=(dictToPlay,)).start()
+                        threading.Thread(target=l.add_chord, args=(dictToPlay,)).start()
 
                     elif hand_sign_id == 5: #is hand is in thumb index mode
                         dictToPlay = {mp_hands.HandLandmark.THUMB_TIP: finger_tips[mp_hands.HandLandmark.THUMB_TIP],
                                       mp_hands.HandLandmark.INDEX_FINGER_TIP: finger_tips[mp_hands.HandLandmark.INDEX_FINGER_TIP]}
-                        threading.Thread(target=add_chord, args=(dictToPlay,)).start()
+                        threading.Thread(target=l.add_chord, args=(dictToPlay,)).start()
                     
-                    elif hand_sign_id == 6 : #is hand is in thumb index mode
+                    elif hand_sign_id == 6 : #is hand is in thumb middle mode
                         dictToPlay = {mp_hands.HandLandmark.THUMB_TIP: finger_tips[mp_hands.HandLandmark.THUMB_TIP],
                                       mp_hands.HandLandmark.MIDDLE_FINGER_TIP: finger_tips[mp_hands.HandLandmark.MIDDLE_FINGER_TIP]}
-                        threading.Thread(target=add_chord, args=(dictToPlay,)).start()
-                        
-                    elif is_hand_near(results.multi_hand_landmarks[0].landmark):
-                        threading.Thread(target=va.command_respond, args=(results,)).start()
-                    #else:
-                    #    threading.Thread(target=play_chord, args=(finger_tips,)).start()
-                
-                if leftOrRight == "Left" and hand_sign_id != last_left_hand_sign_id:
-                    if hand_sign_id == 0 and is_hand_near(results.multi_hand_landmarks[0].landmark):
-                        print("music stop")
-                        last_left_hand_sign_id = 0
+                        threading.Thread(target=l.add_chord, args=(dictToPlay,)).start()
 
-                    if hand_sign_id == 3 and is_hand_near(results.multi_hand_landmarks[0].landmark):
-                        threading.Thread(target=playLoop).start()
-                        last_left_hand_sign_id = 3
+                    elif hand_sign_id == 7 : #is hand is in thumb pinky mode
+                        dictToPlay = {mp_hands.HandLandmark.THUMB_TIP: finger_tips[mp_hands.HandLandmark.THUMB_TIP],
+                                      mp_hands.HandLandmark.PINKY_TIP: finger_tips[mp_hands.HandLandmark.PINKY_TIP]}
+                        threading.Thread(target=l.add_chord, args=(dictToPlay,)).start()
+                        
+                    #elif is_hand_near(results.multi_hand_landmarks[0].landmark):
+                    #    threading.Thread(target=va.command_respond, args=(results,)).start()
+                
+                if last_left_hand_sign_id != 8:
+                    l.recordingMode = False
+
+                if leftOrRight == "Left":
+                    if  hand_sign_id != last_left_hand_sign_id and is_hand_near(results.multi_hand_landmarks[0].landmark):
+                        if hand_sign_id == 0:
+                            l.stopLoop()
+                            last_left_hand_sign_id = 0
+
+                        if hand_sign_id == 3:
+                            threading.Thread(target=l.playLoop).start()
+                            last_left_hand_sign_id = 3
+                        
+                        if hand_sign_id == 8:
+                            if not l.recordingMode:
+                                threading.Thread(target=l.startRecord).start()
+                            last_left_hand_sign_id = 8
+                    else:
+                        last_left_hand_sign_id = -1
                 
         else:
             point_history.append([0, 0])
